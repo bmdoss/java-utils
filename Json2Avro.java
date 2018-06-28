@@ -2,32 +2,107 @@ package com.conversion;
 
 import org.apache.avro.AvroTypeException;
 import org.apache.avro.Schema;
-import org.apache.avro.file.DataFileReader;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.*;
+
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 public class Json2Avro {
+    
+    private static final String json = "{" + "\"name\":\"Frank\"," + "\"age\":\"47\"" + "}";
 
-    public static byte[] jsonToAvro(String json, String schemaStr) throws IOException {
-        InputStream input = null;
-        GenericDatumWriter<GenericRecord> writer = null;
-        Encoder encoder = null;
+    private static final Schema schema1 = new Schema.Parser().parse("{ \"type\":\"record\", \"namespace\":\"foo\", \"name\":\"Person\", \"fields\":[ { \"name\":\"name\", \"type\":\"string\" }, { \"name\":\"age\", \"type\":\"string\" } ] }");
+
+    private static final Schema schema2 = new Schema.Parser().setValidate(true).parse("{ \"type\":\"record\", \"namespace\":\"foo\", \"name\":\"Person\", \"fields\":[ { \"name\":\"name\", \"type\":\"string\" }, { \"name\":\"age\", \"type\":\"int\" } ] }");
+
+public static void main(String[] args) throws IOException {
+        byte[] data = jsonToAvro(json, schema1);
+try {
+    boolean validate = validateJson(data, schema2);
+    System.out.println("validate  "+validate);
+    String jsonString = avroToJson(data, schema1);
+    System.out.println(jsonString);
+}catch(Exception e){
+    e.printStackTrace();
+}
+}
+
+
+    /**
+     * Convert JSON to avro binary array.
+     *
+     * @param json
+     * @param schema
+     * @return
+     * @throws IOException
+     */
+    public static byte[] jsonToAvro(String json, Schema schema) throws IOException {
+        DatumReader<Object> reader = new GenericDatumReader<>(schema);
+        GenericDatumWriter<Object> writer = new GenericDatumWriter<>(schema);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        Decoder decoder = DecoderFactory.get().jsonDecoder(schema, json);
+        Encoder encoder = EncoderFactory.get().binaryEncoder(output, null);
+        Object datum = reader.read(null, decoder);
+        writer.write(datum, encoder);
+        encoder.flush();
+        return output.toByteArray();
+    }
+
+    public static boolean validateJson(byte[] data, Schema schema) throws Exception {
+        InputStream input = new ByteArrayInputStream(data);
+        DataInputStream din = new DataInputStream(input);
+        GenericDatumReader<Object> reader = null;
+        Object datum = null;
+
+        BinaryDecoder binaryDecoder =
+                DecoderFactory.get().binaryDecoder(input, null);
+        try {
+            //DatumReader reader = new GenericDatumReader(schema);
+            reader = new GenericDatumReader<Object>(schema);
+            DatumWriter<Object> writer = new GenericDatumWriter<Object>(schema);
+
+
+
+
+            //Decoder decoder = DecoderFactory.get().jsonDecoder(schema,din);
+            //DatumWriter<Object> writer = new GenericDatumWriter<>(schema);
+            //datum = reader.read(datum, binaryDecoder);
+            //writer.write(datum, binaryDecoder);
+            Decoder decoder = DecoderFactory.get().binaryDecoder(input, null);
+
+            //reader.read(null, decoder);
+            reader.read(din, decoder);
+            //reader.read(null, decoder);
+            //reader.read(din, decoder);
+            return true;
+        } catch (AvroTypeException e) {
+            System.out.println(e.getMessage());
+            return false;
+        }
+    }
+        /**
+     * Convert Avro binary byte array back to JSON String.
+     *
+     * @param avro
+     * @return
+     * @throws IOException
+     */
+    public static String avroToJsonold(byte[] avro, Schema schema) throws IOException {
+        boolean pretty = false;
+        GenericDatumReader<Object> reader = null;
+        JsonEncoder encoder = null;
         ByteArrayOutputStream output = null;
         try {
-            Schema schema = new Schema.Parser().parse(schemaStr);
-            DatumReader<GenericRecord> reader = new GenericDatumReader<GenericRecord>(schema);
-            input = new ByteArrayInputStream(json.getBytes());
+            //Schema schema = new Schema.Parser().parse(schemaStr);
+            reader = new GenericDatumReader<Object>(schema);
+            InputStream input = new ByteArrayInputStream(avro);
             output = new ByteArrayOutputStream();
-            DataInputStream din = new DataInputStream(input);
-            writer = new GenericDatumWriter<GenericRecord>(schema);
-            Decoder decoder = DecoderFactory.get().jsonDecoder(schema, din);
-            encoder = EncoderFactory.get().binaryEncoder(output, null);
-            GenericRecord datum;
+            DatumWriter<Object> writer = new GenericDatumWriter<Object>(schema);
+            encoder = EncoderFactory.get().jsonEncoder(schema, output);
+            //encoder = EncoderFactory.get().jsonEncoder(schema, output, pretty);
+            Decoder decoder = DecoderFactory.get().binaryDecoder(input, null);
+            Object datum;
             while (true) {
                 try {
                     datum = reader.read(null, decoder);
@@ -37,92 +112,61 @@ public class Json2Avro {
                 writer.write(datum, encoder);
             }
             encoder.flush();
-            return output.toByteArray();
+            output.flush();
+            return new String(output.toByteArray());
         } finally {
-            try {
-                input.close();
-            } catch (Exception e) {
-            }
+
         }
     }
 
-    private static String readFileData(String filePath) {
-        String content = "";
+    public static String avroToJson(byte[] avro, Schema schema) throws IOException {
+        boolean pretty = false;
+        GenericDatumReader<Object> reader = null;
+        JsonEncoder encoder = null;
+        ByteArrayOutputStream output = null;
         try {
-            content = new String(Files.readAllBytes(Paths.get(filePath)));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return content;
-    }
-
-    public static String avroToJson(String schemaStr) throws IOException {
-
-        DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
-        System.out.println("schemaStr  :"+schemaStr);
-        DataFileReader<GenericRecord> dataFileReader = new DataFileReader<>(new File(schemaStr), datumReader);
-        Schema schema = dataFileReader.getSchema();
-        System.out.println(schema);
-
-        return null;
-    }
-
-
-    public static boolean validateJson(String json, Schema schema) throws Exception {
-        InputStream input = new ByteArrayInputStream(json.getBytes());
-        DataInputStream din = new DataInputStream(input);
-
-
-        BinaryDecoder binaryDecoder =
-                DecoderFactory.get().binaryDecoder(input, null);
-
-
-        try {
-            DatumReader reader = new GenericDatumReader(schema);
-            //Decoder decoder = DecoderFactory.get().jsonDecoder(schema,din);
-            Object datum = null;
-            //DatumWriter<Object> writer = new GenericDatumWriter<>(schema);
-            //datum = reader.read(datum, binaryDecoder);
-            //writer.write(datum, jsonEncoder);
+            reader = new GenericDatumReader<Object>(schema);
+            InputStream input = new ByteArrayInputStream(avro);
+            output = new ByteArrayOutputStream();
+            DatumWriter<Object> writer = new GenericDatumWriter<Object>(schema);
+            encoder = EncoderFactory.get().jsonEncoder(schema, output);
             Decoder decoder = DecoderFactory.get().binaryDecoder(input, null);
-            //reader.read(null, decoder);
-            reader.read(din, decoder);
-            return true;
-        } catch (AvroTypeException e) {
-            System.out.println(e.getMessage());
-            return false;
+            Object datum;
+            while (true) {
+                try {
+                    datum = reader.read(null, decoder);
+                } catch (EOFException eofe) {
+                    break;
+                }
+                writer.write(datum, encoder);
+            }
+            encoder.flush();
+            output.flush();
+            return new String(output.toByteArray());
+        } finally {
+
         }
     }
 
-    public static void main(String abc[]) {
-
-        String jsonFileContent = readFileData("src/main/resources/EmployeeActivityDATA.json");
-        String schemaFileContent = readFileData("src/main/resources/employee_details.avsc");
-        String avroFileContent = readFileData("src/main/resources/EmplyeeDetails_without_schema.avro");
-        String avroFilePath = "src/main/resources/EmplyeeDetails_without_schema.avro";
-
-       /* try {
-            System.out.println("jsonFileContent  " + jsonFileContent);
-            jsonToAvro(jsonFileContent, schemaFileContent);
-            System.out.println("schemaFileContent " + schemaFileContent);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }*/
-        try {
-            Schema schema = new Schema.Parser().setValidate(true).parse(schemaFileContent);
-            System.out.println("boolean " + validateJson(avroFileContent,schema));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-
-            /*try {
-                System.out.println("jsonFileContent  " + avroFileContent);
-                String data=avroToJson(avroFilePath);
-                System.out.println("Json data " + data);
-            }catch (Exception e){
-                e.printStackTrace();
-            }*/
-
-    }
+    /**
+     * Convert Avro binary byte array back to JSON String.
+     *
+     * @param avro
+     * @param schema
+     * @return
+     * @throws IOException
+     */
+   /* public static String avroToJson(byte[] avro, Schema schema) throws IOException {
+        boolean pretty = false;
+        GenericDatumReader<Object> reader = new GenericDatumReader<>(schema);
+        DatumWriter<Object> writer = new GenericDatumWriter<>(schema);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        JsonEncoder encoder = EncoderFactory.get().jsonEncoder(schema, output, pretty);
+        Decoder decoder = DecoderFactory.get().binaryDecoder(avro, null);
+        Object datum = reader.read(null, decoder);
+        writer.write(datum, encoder);
+        encoder.flush();
+        output.flush();
+        return new String(output.toByteArray(), "UTF-8");
+    }*/
 }
