@@ -1,0 +1,40 @@
+In this example we have defined class Person, it is being used as keys in map. I have intentionally implemented hashcode() method so that hashcode collision will occur.
+
+
+In test class i have defined four instance of person class and added them to hahsmap as keys and a constant string as value. You can notice that instance p1,p3,p4 and p5 will have same hashcode value, as hashcode() method consider only ID. As a result when you put p3 instance to map , it lands under same bucket of instance p1. Same will be happened with p4 and p5 instance.
+
+
+Have a look at the output of this program to understand in details.
+
+  1: ---------- java ----------
+  2: Adding Entries ....
+  3: called hashCode for =1.ABC
+  4: called hashCode for =2.DEF
+  5: called hashCode for =1.XYZ
+  6: called equals on =1.XYZ  to compare with  = 1.ABC
+  7: called hashCode for =1.PQR
+  8: called equals on =1.PQR  to compare with  = 1.XYZ
+  9: called equals on =1.PQR  to compare with  = 1.ABC
+ 10: called hashCode for =1.PQR
+ 11: called equals on =1.PQR  to compare with  = 1.PQR 
+ 12: 
+ 13: Complete Map entries 
+ 14: {1 - PQR=FIVE, 1 - XYZ=THREE, 1 - ABC=ONE, 2 - DEF=TWO} 
+ 15: 
+ 16: Accessing non-collided key
+ 17: called hashCode for =2.DEF
+ 18: Value = TWO 
+ 19: 
+ 20: Accessing collided key
+ 21: called hashCode for =1.ABC
+ 22: called equals on =1.ABC  to compare with  = 1.PQR
+ 23: called equals on =1.ABC  to compare with  = 1.XYZ
+ 24: Value = ONE 
+ 25: 
+ 26: Output completed (0 sec consumed) 
+
+Here you can see log trace of hashcode and equals method to understand HashMap’s behavior. When you put third entry to map , it calls equals method on all the keys which are already present in the same bucket to find duplicate keys , see line no 6. Same behavior can be notice while adding fourth entry, see line no 8 & 9.
+
+
+
+Now consider fifth case where instance p5 is put against “FIVE” value. Instance p4 & p5 are equal as per equals() method implementation so it is a duplicate key, so map should replace existing value with new value. the same behavior you can find in output trace , see line no 11.
